@@ -1,70 +1,84 @@
 from enum import Enum
+from dataclasses import dataclass
 import requests
 import time
-
-class Rail(Enum):
-    RAIL_1 = 1
-    RAIL_2 = 2
+import pygame
+import vlc
 
 class RelaisCircuit(str, Enum):
-    LIGHT_SIGNAL_RAIL1 = "1"
-    LIGHT_SIGNAL_RAIL2 = "2"
+    LIGHT_SIGNAL_1_GREEN = "1"
+    LIGHT_SIGNAL_1_RED = "2"
     TRACK_RAIL1 = "3"
     TRACK_RAIL2 = "4"
-    RAIL_SWITCH1 = "5"
 
 class RelaisValue(str, Enum):
     OFF = "0"
     ON = "1"
 
+class SignalValue(str, Enum):
+    GREEN = "0"
+    RED = "1"
+
+class SignalId(str, Enum):
+    SIGNAL_1 = "Signal 1"
+    SIGNAL_2 = "Signal 2"
+
+class Rail(str, Enum):
+    RAIL_1 = "Rail 1"
+    RAIL_2 = "Rail 2"
+
 class State(str, Enum):
     INIT = "Init"
-    PASSENGER_TRAIN_START = "Passenger train start"
-    PASSENGER_TRAIN_RUN = "Passenger train run"
-    PASSENGER_TRAIN_STOP = "Passenger train stop"
-    PAUSE_1 = "Pause 1"
-    GOODS_TRAIN_START = "Goods train start"
-    GOODS_TRAIN_RUN = "Goods train run"
-    GOODS_TRAIN_STOP = "Goods train stop"
-    PAUSE_2 = "Pause 2"
+    TRAIN_START = "Train start"
+    TRAIN_RUN = "Train run"
+    TRAIN_STOP = "Train stop"
+    PAUSE = "Pause"
 
 class SoundFiles(str, Enum):
-    RAIL_1_LEAVES_STATION = "rail1LeavesStation.mp3"
-    RAIL_1_ARRIVES_STATION = "rail1ArrivesStation.mp3"
+    WHISTLE = "Whistle.mp3"
+
+@dataclass
+class StateMachineData:
+    rail: Rail
+    state: State
+    startTime: float
+    runtimeSeconds: int
+    pauseSeconds: int
 
 server = "http://localhost:8080"
-state = State.INIT
-startTime = time.monotonic()
-RUNTIME_PASSENGER_TRAIN_SECONDS = 10
-RUNTIME_GOODS_TRAIN_SECONDS = 10
-PAUSE_1_SECONDS = 10
-PAUSE_2_SECONDS = 10
+RUNTIME_PASSENGER_TRAIN_SECONDS = 93
+RUNTIME_GOODS_TRAIN_SECONDS = 41
+PAUSE_PASSENGER_TRAIN_SECONDS = 34
+PAUSE_GOODS_TRAIN_SECONDS = 20
 
 def init():
     stopTrain(Rail.RAIL_1)
     stopTrain(Rail.RAIL_2)
     state = State.INIT
+    initSound()
+
+def setSignal(signal, signalValue):
+    if (signal == SignalId.SIGNAL_1):
+        if (signalValue == SignalValue.GREEN):
+            setRelay(RelaisCircuit.LIGHT_SIGNAL_1_RED, RelaisValue.OFF)
+            setRelay(RelaisCircuit.LIGHT_SIGNAL_1_GREEN, RelaisValue.ON)
+        elif (signalValue == SignalValue.RED):
+            setRelay(RelaisCircuit.LIGHT_SIGNAL_1_GREEN, RelaisValue.OFF)
+            setRelay(RelaisCircuit.LIGHT_SIGNAL_1_RED, RelaisValue.ON)
 
 def runTrain(rail):
     if (rail == Rail.RAIL_1):
-        setRelay(RelaisCircuit.RAIL_SWITCH1, RelaisValue.ON);
-        setRelay(RelaisCircuit.LIGHT_SIGNAL_RAIL1, RelaisValue.ON);
-        setRelay(RelaisCircuit.TRACK_RAIL1, RelaisValue.ON);
+        setSignal(SignalId.SIGNAL_1, SignalValue.GREEN)
+        setRelay(RelaisCircuit.TRACK_RAIL1, RelaisValue.ON)
     elif (rail == Rail.RAIL_2):
-        setRelay(RelaisCircuit.RAIL_SWITCH1, RelaisValue.OFF);
-        setRelay(RelaisCircuit.LIGHT_SIGNAL_RAIL2, RelaisValue.ON);
-        setRelay(RelaisCircuit.TRACK_RAIL2, RelaisValue.ON);
+        setRelay(RelaisCircuit.TRACK_RAIL2, RelaisValue.ON)
 
 def stopTrain(rail):
     if (rail == Rail.RAIL_1):
-        setRelay(RelaisCircuit.LIGHT_SIGNAL_RAIL1, RelaisValue.OFF);
-        setRelay(RelaisCircuit.TRACK_RAIL1, RelaisValue.OFF);
+        setSignal(SignalId.SIGNAL_1, SignalValue.RED)
+        setRelay(RelaisCircuit.TRACK_RAIL1, RelaisValue.OFF)
     elif (rail == Rail.RAIL_2):
-        setRelay(RelaisCircuit.LIGHT_SIGNAL_RAIL2, RelaisValue.OFF);
-        setRelay(RelaisCircuit.TRACK_RAIL2, RelaisValue.OFF);
-
-def isTrainAtStation(rail):
-    return True;
+        setRelay(RelaisCircuit.TRACK_RAIL2, RelaisValue.OFF)
 
 def setRelay(circuit, value):
     relaisUrl = server + "/json/relay/" + circuit
@@ -72,55 +86,49 @@ def setRelay(circuit, value):
     headers = {'content-type': 'application/json'}
     response = requests.request("POST", relaisUrl, data=relaisData, headers=headers)
 
-def playSound(soundFile):
-    print(soundFile)
+def initSound():
+    pygame.mixer.init()
 
-def runStateMachine():
-    global state
-    global startTime
-    oldState = state;
+def playBackgroundMusic():      
+    player = vlc.MediaPlayer("John Williams - Home Alone Soundtrack.mp3")
+    vlc.Instance().vlm_set_loop("John Williams - Home Alone Soundtrack.mp3", True)
+    player.play()
+
+def playSound(file):
+    pygame.mixer.music.load(file)
+    pygame.mixer.music.play()
+
+def runStateMachine(data):
+    oldState = data.state;
     
-    if state == State.INIT:
-        if isTrainAtStation(Rail.RAIL_1) and isTrainAtStation(Rail.RAIL_2):
-            state = State.PASSENGER_TRAIN_START
-    elif state == State.PASSENGER_TRAIN_START:
-        playSound(SoundFiles.RAIL_1_LEAVES_STATION)
-        runTrain(Rail.RAIL_1)
-        startTime = time.monotonic()
-        state = State.PASSENGER_TRAIN_RUN
-    elif state == State.PASSENGER_TRAIN_RUN:
-        if (time.monotonic() - startTime >= RUNTIME_PASSENGER_TRAIN_SECONDS):
-            stopTrain(Rail.RAIL_1)
-            playSound(SoundFiles.RAIL_1_ARRIVES_STATION)
-            state = State.PASSENGER_TRAIN_STOP
-    elif state == State.PASSENGER_TRAIN_STOP:
-        if isTrainAtStation(Rail.RAIL_1):
-            startTime = time.monotonic()
-            state = State.PAUSE_1
-    elif state == State.PAUSE_1:
-        if (time.monotonic() - startTime >= PAUSE_1_SECONDS):
-            state = State.GOODS_TRAIN_START
-    elif state == State.GOODS_TRAIN_START:
-        runTrain(Rail.RAIL_2)
-        startTime = time.monotonic()
-        state = State.GOODS_TRAIN_RUN
-    elif state == State.GOODS_TRAIN_RUN:
-        if (time.monotonic() - startTime >= RUNTIME_GOODS_TRAIN_SECONDS):
-            stopTrain(Rail.RAIL_2)
-            state = State.GOODS_TRAIN_STOP
-    elif state == State.GOODS_TRAIN_STOP:
-        if isTrainAtStation(Rail.RAIL_2):
-            startTime = time.monotonic()
-            state = State.PAUSE_2
-    elif state == State.PAUSE_2:
-        if (time.monotonic() - startTime >= PAUSE_2_SECONDS):
-            state = State.PASSENGER_TRAIN_START
+    if data.state == State.INIT:
+        data.state = State.TRAIN_START
+    elif data.state == State.TRAIN_START:
+        playSound(SoundFiles.WHISTLE)
+        runTrain(data.rail)
+        data.startTime = time.monotonic()
+        data.state = State.TRAIN_RUN
+    elif data.state == State.TRAIN_RUN:
+        if (time.monotonic() - data.startTime >= data.runtimeSeconds):
+            stopTrain(data.rail)
+            data.state = State.TRAIN_STOP
+    elif data.state == State.TRAIN_STOP:
+        data.startTime = time.monotonic()
+        data.state = State.PAUSE
+    elif data.state == State.PAUSE:
+        if (time.monotonic() - data.startTime >= data.pauseSeconds):
+            data.state = State.TRAIN_START
     
-    if (oldState != state):
-        print(state.value)
+    if (oldState != data.state):
+        print(data.state.value + ": " + data.rail.value)
 
 def main():
     init()
+    playBackgroundMusic()
+    
+    passengerTrain = StateMachineData(Rail.RAIL_1, State.INIT, 0, RUNTIME_PASSENGER_TRAIN_SECONDS, PAUSE_PASSENGER_TRAIN_SECONDS)
+    goodsTrain = StateMachineData(Rail.RAIL_2, State.INIT, 0, RUNTIME_GOODS_TRAIN_SECONDS, PAUSE_GOODS_TRAIN_SECONDS)
     while True:
-        runStateMachine()
+        runStateMachine(passengerTrain)
+        runStateMachine(goodsTrain)
 main()
