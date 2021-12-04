@@ -13,17 +13,13 @@ bash install-evok.sh
 ```
 
 # wiring
-/json/relay/1
-/json/relay/2
-/json/relay/3
-/json/relay/4
-/json/relay/5
-/json/relay/6
-/json/relay/7
-/json/relay/8
+/json/relay/1 --> Light Signal 1 red
+/json/relay/2 --> Light Signal 1 green
+/json/relay/3 --> Track 1
+/json/relay/4 --> Track 2
 
-/json/ai/1
-/json/ai/2
+/json/ai/1 --> not used
+/json/ai/2 --> not used
 
-/json/input/1
-/json/input/2
+/json/input/1 --> not used
+/json/input/2 --> not used
