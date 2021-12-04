@@ -8,8 +8,8 @@ import vlc
 class RelaisCircuit(str, Enum):
     LIGHT_SIGNAL_1_GREEN = "1"
     LIGHT_SIGNAL_1_RED = "2"
-    TRACK_RAIL1 = "7"
-    TRACK_RAIL2 = "8"
+    TRACK_RAIL1 = "3"
+    TRACK_RAIL2 = "4"
 
 class RelaisValue(str, Enum):
     OFF = "0"
