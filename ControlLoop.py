@@ -8,8 +8,8 @@ import vlc
 class RelaisCircuit(str, Enum):
     LIGHT_SIGNAL_1_GREEN = "1"
     LIGHT_SIGNAL_1_RED = "2"
-    TRACK_RAIL1 = "3"
-    TRACK_RAIL2 = "4"
+    TRACK_RAIL1 = "7"
+    TRACK_RAIL2 = "8"
 
 class RelaisValue(str, Enum):
     OFF = "0"
@@ -35,7 +35,7 @@ class State(str, Enum):
     PAUSE = "Pause"
 
 class SoundFiles(str, Enum):
-    WHISTLE = "Whistle.mp3"
+    WHISTLE = "/home/pi/Desktop/rpi-legotrain/Whistle.mp3"
 
 @dataclass
 class StateMachineData:
@@ -46,9 +46,9 @@ class StateMachineData:
     pauseSeconds: int
 
 server = "http://localhost:8080"
-RUNTIME_PASSENGER_TRAIN_SECONDS = 93
-RUNTIME_GOODS_TRAIN_SECONDS = 41
-PAUSE_PASSENGER_TRAIN_SECONDS = 34
+RUNTIME_PASSENGER_TRAIN_SECONDS = 40
+RUNTIME_GOODS_TRAIN_SECONDS = 20
+PAUSE_PASSENGER_TRAIN_SECONDS = 25
 PAUSE_GOODS_TRAIN_SECONDS = 20
 
 def init():
@@ -90,9 +90,12 @@ def initSound():
     pygame.mixer.init()
 
 def playBackgroundMusic():      
-    player = vlc.MediaPlayer("John Williams - Home Alone Soundtrack.mp3")
-    vlc.Instance().vlm_set_loop("John Williams - Home Alone Soundtrack.mp3", True)
-    player.play()
+    instance = vlc.Instance()
+    media_list = instance.media_list_new(['/home/pi/Desktop/rpi-legotrain/music/John Williams - Home Alone Soundtrack.mp3'])
+    list_player = instance.media_list_player_new()
+    list_player.set_media_list(media_list)
+    list_player.set_playback_mode(vlc.PlaybackMode.loop)
+    list_player.play()
 
 def playSound(file):
     pygame.mixer.music.load(file)
@@ -105,6 +108,7 @@ def runStateMachine(data):
         data.state = State.TRAIN_START
     elif data.state == State.TRAIN_START:
         playSound(SoundFiles.WHISTLE)
+        time.sleep(2.0)
         runTrain(data.rail)
         data.startTime = time.monotonic()
         data.state = State.TRAIN_RUN
